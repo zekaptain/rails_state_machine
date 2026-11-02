@@ -1,8 +1,8 @@
 # rails_state_machine
 
 A loan disbursement workflow in TypeScript, built as one state machine and
-driven by one event log. It brings together three ideas from the rails track
-in `../state-machines-ts`:
+driven by one event log. This is designed as an example repo to help me conceptualize state machines.
+Do not treat as production code.
 
 Anything I have yet to implement is marked as `TODO`.
 
