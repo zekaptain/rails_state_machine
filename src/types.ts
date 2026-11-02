@@ -2,23 +2,23 @@
  * Every type the loan workflow uses. Types only: no runtime code lives here.
  */
 
-export type RejectReason = 'no_transition' | 'guard_failed';
+export type StepRejectionReason = 'no_transition' | 'guard_failed';
 
 /**
- * One edge of a machine. Edges sharing (from, on) are tried in order: the
+ * One edge of a machine. Edges sharing (from, eventType) are tried in order: the
  * first passing guard wins, and an edge without a guard is the else branch.
  */
-export interface Edge<S extends string, C, E extends { type: string }> {
-  from: S;
-  on: E['type'];
-  to: S;
-  guard?: (ctx: C, event: E) => boolean;
-  action?: (ctx: C, event: E) => { ctx: C; effects: Effect[] };
+export interface Edge<TState extends string, TContext, TEvent extends { type: string }> {
+  from: TState;
+  eventType: TEvent['type'];
+  to: TState;
+  guard?: (context: TContext, event: TEvent) => boolean;
+  action?: (context: TContext, event: TEvent) => { context: TContext; effects: Effect[] };
 }
 
-export type StepResult<S extends string, C> =
-  | { kind: 'ok'; state: S; ctx: C; effects: Effect[] }
-  | { kind: 'rejected'; reason: RejectReason; state: S; ctx: C };
+export type StepResult<TState extends string, TContext> =
+  | { kind: 'ok'; state: TState; context: TContext; effects: Effect[] }
+  | { kind: 'rejected'; reason: StepRejectionReason; state: TState; context: TContext };
 
 // Effects: descriptions of what should happen. The machine never performs them.
 
@@ -34,7 +34,7 @@ export type Effect =
   | { type: 'send'; rail: Rail; idempotencyKey: string; amountCents: number }
   | { type: 'post_ledger'; entries: LedgerEntry[] }
   | { type: 'notify_borrower'; message: string }
-  | { type: 'raise_exception'; class: string; context: Record<string, unknown> };
+  | { type: 'raise_exception'; exceptionClass: string; context: Record<string, unknown> };
 
 
 export type LoanState =
@@ -52,7 +52,7 @@ export type LoanState =
   | 'cancelled'
   | 'closed';
 
-export type LoanEvent =
+export type LoanEventType =
   | 'approve'
   | 'decline'
   | 'cancel'
@@ -70,27 +70,27 @@ export type LoanEvent =
   | 'release_collateral'
   | 'liquidate_collateral';
 
-export type TransitionTable = Readonly<Record<LoanState, Readonly<Partial<Record<LoanEvent, LoanState>>>>>;
+export type LoanTransitionTable = Readonly<Record<LoanState, Readonly<Partial<Record<LoanEventType, LoanState>>>>>;
 
-export interface TransitionRecord {
+export interface LoanTransition {
   from: LoanState;
-  event: LoanEvent;
+  event: LoanEventType;
   to: LoanState;
 }
 
 /** Raised only by the attempt child or the collateral region. */
-export type InternalLoanEvent = 'rail_settled' | 'rail_rejected' | 'rail_returned' | 'release_collateral' | 'liquidate_collateral';
+export type InternalLoanEventType = 'rail_settled' | 'rail_rejected' | 'rail_returned' | 'release_collateral' | 'liquidate_collateral';
 
 /** What the loan region's edges receive. */
-export interface LoanInput {
-  type: LoanEvent;
+export interface LoanEventPayload {
+  type: LoanEventType;
   id: string;
   /** Minutes since midnight, America/New_York. */
-  at: number;
+  minutesSinceMidnightET: number;
   /** rail_returned: the ACH return code (R01, R02, ...). */
-  code?: string;
+  returnCode?: string;
   /** rail_rejected: why the rail refused. */
-  reason?: string;
+  rejectionReason?: string;
   /** update_destination: the corrected bank account. */
   destination?: Destination;
 }
@@ -98,7 +98,7 @@ export type Rail = 'rtp' | 'ach' | 'wire';
 export type AccountState = 'open' | 'closed' | 'frozen' | 'unknown';
 
 export interface Destination {
-  railSupport: readonly Rail[];
+  supportedRails: readonly Rail[];
   accountState: AccountState;
 }
 
@@ -107,7 +107,7 @@ export interface LoanContext {
   borrowerId: string;
   principalCents: number;
   /** Attempts already created. 0 before the first send. */
-  attempt: number;
+  attemptCount: number;
   maxAttempts: number;
   destination: Destination;
   /** Set by a return. */
@@ -125,10 +125,10 @@ export interface AttemptEvent {
   type: 'accepted' | 'settled' | 'rejected';
 }
 export interface Attempt {
-  id: number;
+  attemptNumber: number;
   phase: AttemptPhase;
   rail: Rail;
-  key: string;
+  idempotencyKey: string;
 }
 
 export type CollateralState = 'in_vault' | 'released' | 'liquidated';
@@ -136,34 +136,34 @@ export interface CollateralEvent {
   type: 'release' | 'liquidate';
 }
 
-export interface Snapshot {
-  loan: LoanState;
-  ctx: LoanContext;
-  /** The child machine. Present only while loan === 'disbursing'. */
+export interface WorkflowSnapshot {
+  loanState: LoanState;
+  loanContext: LoanContext;
+  /** The child machine. Present only while loanState === 'disbursing'. */
   attempt: Attempt | null;
-  collateral: CollateralState;
+  collateralState: CollateralState;
 }
 
 export type RailOutcome = 'accepted' | 'settled' | 'rejected' | 'returned';
 
 /** One entry in the event log that drives the workflow. */
 export type WorkflowEvent =
-  | { source: 'loan'; id: string; at: number; command: LoanEvent; destination?: Destination }
-  | { source: 'rail'; id: string; at: number; outcome: RailOutcome; code?: string; reason?: string }
-  | { source: 'collateral'; id: string; at: number; action: CollateralEvent['type'] };
+  | { source: 'loan'; id: string; minutesSinceMidnightET: number; command: LoanEventType; destination?: Destination }
+  | { source: 'rail'; id: string; minutesSinceMidnightET: number; outcome: RailOutcome; returnCode?: string; rejectionReason?: string }
+  | { source: 'collateral'; id: string; minutesSinceMidnightET: number; action: CollateralEvent['type'] };
 
-export interface RegionLog {
+export interface RegionTransition {
   region: Region;
   from: string;
   to: string;
   /** Id of the event that caused the move. */
-  cause: string;
+  causeEventId: string;
 }
 
 export interface DispatchResult {
-  snapshot: Snapshot;
+  snapshot: WorkflowSnapshot;
   effects: Effect[];
-  log: RegionLog[];
+  transitions: RegionTransition[];
 }
 
 // Scenarios and harness (scenarios.ts, harness.ts)
@@ -173,10 +173,10 @@ export interface Scenario {
   title: string;
   level: 'easy' | 'hard';
   tags: string[];
-  ctx: LoanContext;
+  initialContext: LoanContext;
   events: WorkflowEvent[];
   expected: {
-    loan: LoanState;
+    finalLoanState: LoanState;
     netFundsSentCents: number;
     /** raise_exception classes, in order. */
     exceptions?: string[];

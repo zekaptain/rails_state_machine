@@ -1,22 +1,25 @@
 // Usage: bun run demo [scenario-id]
 import { runScenario } from './harness';
 import { SCENARIOS } from './scenarios';
-import { initialSnapshot, run } from './workflow';
+import { initialSnapshot, runWorkflow } from './workflow';
 
-const only = process.argv[2];
+const scenarioIdFilter = process.argv[2];
+const scenarios = SCENARIOS.filter((scenario) => scenarioIdFilter === undefined || scenario.id === scenarioIdFilter);
 
-for (const scn of SCENARIOS.filter((s) => only === undefined || s.id === only)) {
-  console.log(`\n${scn.id}: ${scn.title}`);
+for (const scenario of scenarios) {
+  console.log(`\n${scenario.id}: ${scenario.title}`);
   try {
-    const { snapshot, effects, log } = run(scn.events, initialSnapshot(scn.ctx));
-    for (const l of log) console.log(`  ${l.cause.padEnd(4)} ${l.region.padEnd(10)} ${l.from} -> ${l.to}`);
-    for (const e of effects) console.log(`  effect ${JSON.stringify(e)}`);
-    console.log(`  final: loan ${snapshot.loan}, collateral ${snapshot.collateral}`);
+    const { snapshot, effects, transitions } = runWorkflow(scenario.events, initialSnapshot(scenario.initialContext));
+    for (const transition of transitions) {
+      console.log(`  ${transition.causeEventId.padEnd(4)} ${transition.region.padEnd(10)} ${transition.from} -> ${transition.to}`);
+    }
+    for (const effect of effects) console.log(`  effect ${JSON.stringify(effect)}`);
+    console.log(`  final: loan ${snapshot.loanState}, collateral ${snapshot.collateralState}`);
   } catch (err) {
     console.log(`  run: ${err}`);
   }
   try {
-    console.log(`  row ${JSON.stringify(runScenario(scn).row)}`);
+    console.log(`  row ${JSON.stringify(runScenario(scenario).row)}`);
   } catch (err) {
     console.log(`  row: ${err}`);
   }

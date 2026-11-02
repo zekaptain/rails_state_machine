@@ -1,4 +1,4 @@
-import type { Region, RejectReason, WorkflowEvent } from './types';
+import type { Region, StepRejectionReason, WorkflowEvent } from './types';
 
 /** Illegal transition error, extended with the region and the kind of "no". */
 export class IllegalTransitionError extends Error {
@@ -6,7 +6,7 @@ export class IllegalTransitionError extends Error {
     public readonly from: string,
     public readonly event: string,
     public readonly region: Region = 'loan',
-    public readonly reason: RejectReason = 'no_transition',
+    public readonly reason: StepRejectionReason = 'no_transition',
   ) {
     super(`illegal transition in ${region}: ${reason} from '${from}' on '${event}'`);
     this.name = 'IllegalTransitionError';

@@ -4,13 +4,7 @@ A loan disbursement workflow in TypeScript, built as one state machine and
 driven by one event log. It brings together three ideas from the rails track
 in `../state-machines-ts`:
 
-| Idea | Challenge | Here |
-|---|---|---|
-| The machine is data: a table, illegal transitions, terminal states, reachability | 01 | `src/loan.ts` |
-| Guards, context, and effects as data | 02 | `src/machine.ts`, `src/loan.ts` |
-| Composition: an attempt inside `disbursing`, collateral alongside | 04 | `src/workflow.ts` |
-
-Anything I need to implement, I've marked as `TODO`.
+Anything I have yet to implement is marked as `TODO`.
 
 ## Layout
 
@@ -20,7 +14,7 @@ src/
   errors.ts       extended IllegalTransitionError; UnhandledEventError (done)
   machine.ts      1. generic engine: step
   loan.ts         2. loan transition table and queries, plus the guarded edges
-  workflow.ts     3. composition: dispatch and run
+  workflow.ts     3. composition: dispatch and runWorkflow
   scenarios.ts    4. event-log fixtures (one example included)
   harness.ts      5. invariants and result rows
   demo.ts         prints each scenario's trace and row (done)
@@ -40,6 +34,6 @@ src/
   carries the id of the event that caused it.
 - The borrower status never lies. After a return it says "returned",
   never "delivered".
-- Time arrives on events. `at` is minutes since midnight,
+- Time arrives on events. `minutesSinceMidnightET` is minutes since midnight,
   America/New_York. No `Date.now()`.
-  - Every move is logged. Each region that changes writes one `RegionLog`.
+  - Every move is logged. Each region that changes writes one `RegionTransition`.

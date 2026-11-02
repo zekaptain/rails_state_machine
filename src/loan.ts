@@ -3,10 +3,10 @@
  * then the guarded edges that `step` runs. README §2.
  */
 import { IllegalTransitionError } from './errors';
-import type { Edge, LoanContext, LoanEvent, LoanInput, LoanState, Rail, TransitionRecord, TransitionTable } from './types';
+import type { Edge, LoanContext, LoanEventPayload, LoanEventType, LoanState, LoanTransition, LoanTransitionTable, Rail } from './types';
 
 /** Loan transitions table: the plain edges of the lifecycle. Terminal states get `{}`. */
-export const LOAN_TRANSITIONS: TransitionTable = {
+export const LOAN_TRANSITIONS: LoanTransitionTable = {
   applied: {
     approve: 'approved',
     decline: 'declined',
@@ -53,14 +53,14 @@ export const LOAN_TRANSITIONS: TransitionTable = {
 };
 
 /** Return the next state, or throw IllegalTransitionError. */
-export function transition(state: LoanState, event: LoanEvent, table: TransitionTable = LOAN_TRANSITIONS): LoanState {
+export function transition(state: LoanState, event: LoanEventType, table: LoanTransitionTable = LOAN_TRANSITIONS): LoanState {
   // index table by state, then by event to get next state
   const nextState = table[state][event];
   if (nextState === undefined) throw new IllegalTransitionError(state, event);
   return nextState;
 }
 
-export function canTransition(state: LoanState, event: LoanEvent, table: TransitionTable = LOAN_TRANSITIONS): boolean {
+export function canTransition(state: LoanState, event: LoanEventType, table: LoanTransitionTable = LOAN_TRANSITIONS): boolean {
   const nextState = table[state][event];
   if (nextState === undefined) return false;
   return true;
@@ -69,11 +69,11 @@ export function canTransition(state: LoanState, event: LoanEvent, table: Transit
 /** Fold the events over the table. Log every transition. Stop at the first illegal one by throwing. */
 export function replay(
   initial: LoanState,
-  events: readonly LoanEvent[],
-  table: TransitionTable = LOAN_TRANSITIONS,
-): { state: LoanState; log: TransitionRecord[] } {
+  events: readonly LoanEventType[],
+  table: LoanTransitionTable = LOAN_TRANSITIONS,
+): { state: LoanState; log: LoanTransition[] } {
   let state = initial;
-  const log: TransitionRecord[] = [];
+  const log: LoanTransition[] = [];
   for (const event of events) {
     if (!canTransition(state, event, table)) throw new IllegalTransitionError(state, event);
     const nextState = transition(state, event, table);
@@ -83,23 +83,23 @@ export function replay(
   return { state, log };
 }
 
-/** I got sick of casting the Object.keys() to `LoanState` */
-export function stateKeys(table: TransitionTable): LoanState[] {
+/** The states in `table`, typed as `LoanState` instead of `string`. */
+export function statesOf(table: LoanTransitionTable): LoanState[] {
   return Object.keys(table) as LoanState[];
 }
 
-// Oh this is even simpler than above
+/** `Object.entries` with the key and value types preserved. */
 export function typedEntries<K extends PropertyKey, V>(obj: Partial<Record<K, V>>): [K, V][] {
   return Object.entries(obj) as [K, V][];
 }
 
 /** States with no outgoing edges. Derived from the table. */
-export function terminalStates(table: TransitionTable = LOAN_TRANSITIONS): Set<LoanState> {
+export function terminalStates(table: LoanTransitionTable = LOAN_TRANSITIONS): Set<LoanState> {
   const terminal = new Set<LoanState>();
-  for (const [state, row] of typedEntries(table)) {
+  for (const [state, nextStateByEvent] of typedEntries(table)) {
     // state: LoanState
-    // row: Readonly<Partial<Record<LoanEvent, LoanState>>>
-    if (Object.keys(row).length === 0) terminal.add(state);
+    // nextStateByEvent: Readonly<Partial<Record<LoanEventType, LoanState>>>
+    if (Object.keys(nextStateByEvent).length === 0) terminal.add(state);
   }
   return terminal;
 }
@@ -107,42 +107,42 @@ export function terminalStates(table: TransitionTable = LOAN_TRANSITIONS): Set<L
 /** Every state reachable from `from` (inclusive). BFS over the table.
  *  I chose BFS because it's easier to conceptualize the implementation.
  */
-export function reachable(from: LoanState, table: TransitionTable = LOAN_TRANSITIONS): Set<LoanState> {
-  const seen = new Set<LoanState>([from]);
+export function reachableStates(from: LoanState, table: LoanTransitionTable = LOAN_TRANSITIONS): Set<LoanState> {
+  const visited = new Set<LoanState>([from]);
   const queue: LoanState[] = [from];
-  let state = queue.shift();
-  while (state !== undefined) {
-    for (const [, next] of typedEntries(table[state])) {
-			if (!seen.has(next)) {
-				seen.add(next);
-				queue.push(next);
+  let current = queue.shift();
+  while (current !== undefined) {
+    for (const [, nextState] of typedEntries(table[current])) {
+			if (!visited.has(nextState)) {
+				visited.add(nextState);
+				queue.push(nextState);
       }
     }
     // move to next state at end of while loop
-    state = queue.shift();
+    current = queue.shift();
   }
-  return seen;
+  return visited;
 }
 
-/** `disb:<loanId>:<attempt>`. README §2. */
-export function idempotencyKey(loanId: string, attempt: number): string {
-  throw new Error('TODO: idempotencyKey');
+/** `disb:<loanId>:<attemptNumber>`. README §2. */
+export function disbursementIdempotencyKey(loanId: string, attemptNumber: number): string {
+  throw new Error('TODO: disbursementIdempotencyKey');
 }
 
-/** Routing policy. `at` is minutes since midnight ET. README §2. */
-export function chooseRail(ctx: LoanContext, at: number): Rail | null {
+/** Routing policy. README §2. */
+export function chooseRail(context: LoanContext, minutesSinceMidnightET: number): Rail | null {
   throw new Error('TODO: chooseRail');
 }
 
 /** Loan transition table as plain edges: no guard, no action. */
-export function edgesFrom(table: TransitionTable): Edge<LoanState, LoanContext, LoanInput>[] {
-  throw new Error('TODO: edgesFrom');
+export function edgesFromTable(table: LoanTransitionTable): Edge<LoanState, LoanContext, LoanEventPayload>[] {
+  throw new Error('TODO: edgesFromTable');
 }
 
 /**
  * What `step` runs: the hand-written edges from README §2 first, so they win,
- * then edgesFrom(LOAN_TRANSITIONS).
+ * then edgesFromTable(LOAN_TRANSITIONS).
  */
-export const LOAN_EDGES: readonly Edge<LoanState, LoanContext, LoanInput>[] = [
+export const LOAN_EDGES: readonly Edge<LoanState, LoanContext, LoanEventPayload>[] = [
   // TODO
 ];

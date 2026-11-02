@@ -1,11 +1,11 @@
-import type { Effect, RegionLog, ResultRow, Scenario, Snapshot } from './types';
+import type { Effect, RegionTransition, ResultRow, Scenario, WorkflowSnapshot } from './types';
 
 /** Names of the invariants that fail right now. Call after every event. README §4. */
-export function checkInvariants(snapshot: Snapshot, effects: readonly Effect[]): string[] {
-  throw new Error('TODO: checkInvariants');
+export function findViolatedInvariants(snapshot: WorkflowSnapshot, effects: readonly Effect[]): string[] {
+  throw new Error('TODO: findViolatedInvariants');
 }
 
 /** Play one scenario event by event and score it. README §4. */
-export function runScenario(scenario: Scenario): { trace: RegionLog[]; effects: Effect[]; row: ResultRow } {
+export function runScenario(scenario: Scenario): { trace: RegionTransition[]; effects: Effect[]; row: ResultRow } {
   throw new Error('TODO: runScenario');
 }
