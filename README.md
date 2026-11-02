@@ -37,3 +37,13 @@ src/
 - Time arrives on events. `minutesSinceMidnightET` is minutes since midnight,
   America/New_York. No `Date.now()`.
   - Every move is logged. Each region that changes writes one `RegionTransition`.
+
+## Commands
+
+```sh
+bun test                       # fails TODO until I've written that code
+bun test src/loan.test.ts      # test one file
+bun run typecheck
+bun run demo                   # trace and result row for every demo scenario
+bun run demo happy-rtp-closed  # run the "happy path RTP closed" scenario
+```
