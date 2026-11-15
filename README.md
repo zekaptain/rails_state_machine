@@ -1,7 +1,7 @@
 # rails_state_machine
 
 A loan disbursement workflow in TypeScript, built as one state machine and
-driven by one event log. This is designed as an example repo to help me conceptualize state machines.
+driven by one event log. This is designed as an example repo to help me conceptualize state machines. No actual money gets moved.
 Do not treat as production code.
 
 Anything I have yet to implement is marked as `TODO`.
@@ -23,20 +23,12 @@ src/
 
 ## Rules
 
-- Illegal transitions throw an error.
-  - `new IllegalTransitionError(from, event,
-    region, reason)` carries all four. `region` defaults to `'loan'` and
-    `reason` (`no_transition` or `guard_failed`) to `'no_transition'`. No silent no-ops.
-- Effects are data.
-  - Edges return `send`, `post_ledger`, `notify_borrower`, and `raise_exception`.
-    Nothing here moves money.
-- The ledger balances. Every `post_ledger` sums to zero, and every entry
-  carries the id of the event that caused it.
-- The borrower status never lies. After a return it says "returned",
-  never "delivered".
-- Time arrives on events. `minutesSinceMidnightET` is minutes since midnight,
-  America/New_York. No `Date.now()`.
-  - Every move is logged. Each region that changes writes one `RegionTransition`.
+- If a transition isn't allowed, we throw `IllegalTransitionError(from, event, region, reason)` instead of silently doing nothing. `region` defaults to `'loan'`, and `reason` is `'no_transition'` or `'guard_failed'`.
+- Transitions return effects as data: `send`, `post_ledger`, `notify_borrower`, and `raise_exception`.
+- Each `post_ledger` must sum to zero. Every entry includes the ID of the event that caused it.
+- After a return, the borrower status must say "returned", not "delivered".
+- Use the time on the event, not `Date.now()`. `minutesSinceMidnightET` is the number of minutes since midnight in `America/New_York`.
+- Log every state change. Each region that changes writes a single `RegionTransition`.
 
 ## Commands
 
